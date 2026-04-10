@@ -3112,6 +3112,7 @@ async function loadRecentEntries() {
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.bezeichnung)}</div>
         <div style="font-size:.75rem;color:var(--ink3)">${esc(o.projekt)} · ${statusPill(o.status)}</div>
+        ${o.kommentar ? `<div style="font-size:.74rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${linkifyText(o.kommentar)}</div>` : ''}
       </div>
       <button onclick="loescheRecentEntry('${o.id}')" title="Löschen"
         style="width:26px;height:26px;border:none;background:none;cursor:pointer;color:var(--ink3);font-size:1rem;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;flex-shrink:0"
