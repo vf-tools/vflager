@@ -1194,7 +1194,7 @@ function renderLieferantView() {
 
   let gruppenHtml = '';
   keys.forEach((key, gi) => {
-    const items = sortOrders(gruppen[key], 'status', 1);
+    const items = sortOrders(gruppen[key], 'datum', -1);
     const isKein = key === '__kein__';
     const label  = isKein ? 'Kein Lieferant eingetragen' : key;
     const offen  = items.filter(o => o.status === 'neu/offen' && o.artikelnummer !== '9999').length;
@@ -4780,4 +4780,119 @@ document.getElementById('btn-switch-role').addEventListener('click', function() 
   document.getElementById('screen-role').style.display = 'flex';
   APP.role = null; dismissBanner();
 });
+</script><script>
+// ── Selbsttest-System ─────────────────────────────────────────────────
+// Läuft einmalig beim ersten Rollenwechsel (login).
+// Zeigt nur bei Fehlern eine Meldung — bei Erfolg passiert nichts sichtbares.
+
+var _selftestDone = false;
+
+async function runSelftests() {
+  if (_selftestDone) return;
+  _selftestDone = true;
+
+  var results = [];
+
+  // ── Test 1: Datenbankverbindung ─────────────────────────────────────
+  try {
+    var sb = await initSupabase();
+    var probe = await sb.from('orders').select('id').limit(1);
+    if (probe.error) throw probe.error;
+    results.push({ name: 'Datenbankverbindung', ok: true });
+  } catch(e) {
+    results.push({ name: 'Datenbankverbindung', ok: false, msg: e.message || String(e) });
+  }
+
+  // ── Test 2: Tabelle lädt (orders) ───────────────────────────────────
+  try {
+    var orders = await API.orders.list();
+    if (!Array.isArray(orders)) throw new Error('Kein Array zurückgegeben');
+    results.push({ name: 'Bestellungen laden', ok: true });
+  } catch(e) {
+    results.push({ name: 'Bestellungen laden', ok: false, msg: e.message || String(e) });
+  }
+
+  // ── Test 3: Artikelstamm lädt ───────────────────────────────────────
+  try {
+    var stamm = await API.stamm.list();
+    if (typeof stamm !== 'object') throw new Error('Kein Objekt zurückgegeben');
+    results.push({ name: 'Artikelstamm laden', ok: true });
+  } catch(e) {
+    results.push({ name: 'Artikelstamm laden', ok: false, msg: e.message || String(e) });
+  }
+
+  // ── Test 4: Projekte laden ──────────────────────────────────────────
+  try {
+    var projekte = await API.projekte.list();
+    if (!Array.isArray(projekte)) throw new Error('Kein Array zurückgegeben');
+    results.push({ name: 'Projekte laden', ok: true });
+  } catch(e) {
+    results.push({ name: 'Projekte laden', ok: false, msg: e.message || String(e) });
+  }
+
+  // ── Test 5: Toast-Funktion vorhanden ────────────────────────────────
+  try {
+    if (typeof window.toast !== 'function') throw new Error('toast() nicht definiert');
+    results.push({ name: 'Fehlermeldung-Funktion', ok: true });
+  } catch(e) {
+    results.push({ name: 'Fehlermeldung-Funktion', ok: false, msg: e.message });
+  }
+
+  // ── Auswertung ───────────────────────────────────────────────────────
+  var failed = results.filter(function(r) { return !r.ok; });
+
+  // Immer in Konsole loggen
+  console.group('[Vanfabrik] Selbsttest');
+  results.forEach(function(r) {
+    if (r.ok) {
+      console.log('%c✓ ' + r.name, 'color:#1a6632;font-weight:600');
+    } else {
+      console.error('✗ ' + r.name + ' — ' + r.msg);
+    }
+  });
+  console.groupEnd();
+
+  // Nur bei Fehlern eine sichtbare Meldung zeigen
+  if (failed.length === 0) return;
+
+  var banner = document.createElement('div');
+  banner.id = 'selftest-banner';
+  banner.style.cssText = [
+    'position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%)',
+    'background:#fff;border:1px solid var(--border)',
+    'border-left:3px solid var(--burgundy)',
+    'border-radius:var(--r-lg);padding:.9rem 1.1rem',
+    'box-shadow:0 4px 20px rgba(0,0,0,.12)',
+    'z-index:3000;max-width:420px;width:calc(100vw - 2rem)',
+    'font-family:var(--font);font-size:.82rem',
+  ].join(';');
+
+  var rows = failed.map(function(r) {
+    return '<div style="display:flex;gap:.6rem;padding:.3rem 0;border-bottom:1px solid var(--border)">' +
+      '<span style="color:var(--burgundy);flex-shrink:0">&#9888;</span>' +
+      '<div>' +
+        '<div style="font-weight:600;color:var(--ink)">' + esc(r.name) + '</div>' +
+        '<div style="color:var(--ink3);font-size:.76rem;margin-top:1px">' + esc(r.msg) + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  banner.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">' +
+      '<span style="font-weight:600;color:var(--burgundy)">' + failed.length + ' Problem' + (failed.length > 1 ? 'e' : '') + ' beim Start</span>' +
+      '<button onclick="document.getElementById(\'selftest-banner\').remove()" ' +
+        'style="border:none;background:none;cursor:pointer;color:var(--ink3);font-size:1rem;padding:0;line-height:1">&times;</button>' +
+    '</div>' +
+    rows +
+    '<div style="margin-top:.7rem;font-size:.74rem;color:var(--ink3)">Details in der Browser-Konsole (F12)</div>';
+
+  document.body.appendChild(banner);
+}
+
+// Selbsttest beim ersten Login starten
+var _origSwitchRole = switchRole;
+switchRole = async function(role) {
+  await _origSwitchRole(role);
+  setTimeout(runSelftests, 800); // kurz warten bis App-Init durch
+};
 </script></body></html>
